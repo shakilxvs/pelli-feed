@@ -43,16 +43,15 @@ export function formatPrice(amount: string, currencyCode: string): string {
   }).format(parseFloat(amount))
 }
 
+const SIZE_NAMES = ['size', 'sizes', 'shoe size', 'kids size', 'child size', 'uk size', 'eu size']
+const COLOR_NAMES = ['color', 'colour', 'colors', 'colours']
+
 export function getSizeOption(product: Product): ProductOption | undefined {
-  return product.options.find(
-    (o) => o.name.toLowerCase() === 'size'
-  )
+  return product.options.find((o) => SIZE_NAMES.includes(o.name.toLowerCase()))
 }
 
 export function getColorOption(product: Product): ProductOption | undefined {
-  return product.options.find(
-    (o) => o.name.toLowerCase() === 'color' || o.name.toLowerCase() === 'colour'
-  )
+  return product.options.find((o) => COLOR_NAMES.includes(o.name.toLowerCase()))
 }
 
 export function hasColors(product: Product): boolean {
