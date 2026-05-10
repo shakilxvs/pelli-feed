@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 
 const PRODUCTS_QUERY = `
-  query Products {
-    products(first: 50) {
+  query Products($cursor: String) {
+    products(first: 250, after: $cursor) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
       edges {
         node {
           id
@@ -49,63 +53,68 @@ const PRODUCTS_QUERY = `
   }
 `
 
+async function fetchPage(domain: string, token: string, cursor: string | null) {
+  const response = await fetch(
+    `https://${domain}/api/2024-01/graphql.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Shopify-Storefront-Private-Token': token,
+      },
+      body: JSON.stringify({
+        query: PRODUCTS_QUERY,
+        variables: { cursor },
+      }),
+      next: { revalidate: 300 },
+    }
+  )
+  if (!response.ok) throw new Error(`Shopify API returned ${response.status}`)
+  const data = await response.json()
+  if (data.errors) throw new Error(data.errors[0]?.message || 'GraphQL error')
+  return data.data.products
+}
+
+function normalizeProduct(node: any) {
+  return {
+    id: node.id,
+    title: node.title,
+    handle: node.handle,
+    image: node.images.edges[0]?.node ?? null,
+    price: node.priceRange.minVariantPrice,
+    options: node.options,
+    variants: node.variants.edges.map(({ node: v }: any) => ({
+      id: v.id,
+      title: v.title,
+      price: v.price,
+      selectedOptions: v.selectedOptions,
+      availableForSale: v.availableForSale,
+    })),
+  }
+}
+
 export async function GET() {
   const domain = process.env.SHOPIFY_STORE_DOMAIN
   const token = process.env.SHOPIFY_STOREFRONT_PRIVATE_TOKEN
 
   if (!domain || !token) {
-    return NextResponse.json(
-      { error: 'Store configuration is missing.' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Store configuration is missing.' }, { status: 500 })
   }
 
   try {
-    const response = await fetch(
-      `https://${domain}/api/2024-01/graphql.json`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Shopify-Storefront-Private-Token': token,
-        },
-        body: JSON.stringify({ query: PRODUCTS_QUERY }),
-        next: { revalidate: 300 },
-      }
-    )
+    const allProducts: any[] = []
+    let cursor: string | null = null
+    let hasNextPage = true
 
-    if (!response.ok) {
-      const text = await response.text()
-      console.error('Shopify error:', response.status, text)
-      throw new Error(`Shopify API returned ${response.status}`)
+    // Paginate through all products
+    while (hasNextPage) {
+      const page = await fetchPage(domain, token, cursor)
+      page.edges.forEach(({ node }: any) => allProducts.push(normalizeProduct(node)))
+      hasNextPage = page.pageInfo.hasNextPage
+      cursor = page.pageInfo.endCursor
     }
 
-    const data = await response.json()
-
-    if (data.errors) {
-      console.error('GraphQL errors:', data.errors)
-      throw new Error(data.errors[0]?.message || 'GraphQL error')
-    }
-
-    const products = data.data.products.edges.map(
-      ({ node }: any) => ({
-        id: node.id,
-        title: node.title,
-        handle: node.handle,
-        image: node.images.edges[0]?.node ?? null,
-        price: node.priceRange.minVariantPrice,
-        options: node.options,
-        variants: node.variants.edges.map(({ node: v }: any) => ({
-          id: v.id,
-          title: v.title,
-          price: v.price,
-          selectedOptions: v.selectedOptions,
-          availableForSale: v.availableForSale,
-        })),
-      })
-    )
-
-    return NextResponse.json({ products })
+    return NextResponse.json({ products: allProducts })
   } catch (error: any) {
     console.error('Products fetch error:', error)
     return NextResponse.json(
