@@ -57,8 +57,12 @@ export default function VariantSelector({
   onSizeChange,
   onColorChange,
 }: VariantSelectorProps) {
-  const sizeOption = getSizeOption(product)
-  const colorOption = getColorOption(product)
+  const sizeOption = product.options.find((o) =>
+    ['size', 'sizes', 'shoe size', 'kids size', 'child size', 'uk size', 'eu size'].includes(o.name.toLowerCase())
+  )
+  const colorOption = product.options.find((o) =>
+    ['color', 'colour', 'colors', 'colours'].includes(o.name.toLowerCase())
+  )
 
   if (!sizeOption && !colorOption) return null
 
