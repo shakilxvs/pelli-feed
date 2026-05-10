@@ -6,7 +6,7 @@ function isValidEmail(email: string): boolean {
 
 function isValidOrderId(orderId: string): boolean {
   const cleaned = orderId.replace(/^#/, '').trim()
-  return /^\d{3,}$/.test(cleaned)
+  return /^[A-Za-z0-9]{3,}$/.test(cleaned)
 }
 
 function maskEmail(email: string): string {
@@ -39,17 +39,14 @@ export async function POST(request: NextRequest) {
 
     if (!isValidEmail(email)) {
       return NextResponse.json(
-        { error: 'That email address doesn\'t look right. Please double-check it.' },
+        { error: "That email address doesn't look right. Please double-check it." },
         { status: 400 }
       )
     }
 
     if (!isValidOrderId(orderId)) {
       return NextResponse.json(
-        {
-          error:
-            'Please enter a valid order number — you\'ll find it in your confirmation email (e.g. #1234).',
-        },
+        { error: "Please enter a valid order number — you'll find it in your confirmation email." },
         { status: 400 }
       )
     }
